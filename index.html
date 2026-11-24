@@ -1,0 +1,685 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>채무조정 진단</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 업무용 프로그램 화면. 상단 앱바 / 왼쪽 사건 입력 패널(고정, 내부 스크롤) / 오른쪽 판정서 패널(권고 → 산정 → 제도별 판정표) / 하단 참고 패널과 상태 표시줄 */
+:root {
+  --bg: #edf0f4;
+  --panel: #ffffff;
+  --panel-2: #f5f7fa;
+  --ink: #131b27;
+  --ink-2: #4a566b;
+  --ink-3: #7c879a;
+  --rule: #dbe1e9;
+  --rule-strong: #bcc5d2;
+  --accent: #174a7c;
+  --on-accent: #ffffff;
+  --accent-wash: #e8eef6;
+  --ok: #17704a;
+  --ok-wash: #e2f1e9;
+  --hold: #8a5800;
+  --hold-wash: #faefd8;
+  --stop: #9a2d2d;
+  --stop-wash: #f7e4e2;
+  --pay: #b7c4d5;
+  --font-ui: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1017; --panel: #111822; --panel-2: #17202c; --ink: #e3e8ef; --ink-2: #a2aec0; --ink-3: #74809a;
+    --rule: #232e3d; --rule-strong: #34425a; --accent: #80aee6; --on-accent: #0b1017; --accent-wash: #162435;
+    --ok: #5cc28d; --ok-wash: #11261c; --hold: #dfae4e; --hold-wash: #292112; --stop: #ee8a80; --stop-wash: #2d1817;
+    --pay: #3a4a61; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1017; --panel: #111822; --panel-2: #17202c; --ink: #e3e8ef; --ink-2: #a2aec0; --ink-3: #74809a;
+  --rule: #232e3d; --rule-strong: #34425a; --accent: #80aee6; --on-accent: #0b1017; --accent-wash: #162435;
+  --ok: #5cc28d; --ok-wash: #11261c; --hold: #dfae4e; --hold-wash: #292112; --stop: #ee8a80; --stop-wash: #2d1817;
+  --pay: #3a4a61; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14.5px; line-height: 1.6; word-break: keep-all; overflow-wrap: break-word; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+h1, h2, h3, p { margin: 0; }
+h2, h3 { text-wrap: balance; }
+button { font: inherit; color: inherit; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.inner { max-width: 1280px; margin: 0 auto; }
+
+/* 앱바 */
+.appbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border-bottom: 1px solid var(--rule); }
+.appbar .inner { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; min-height: 56px; padding-block: 8px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mark { width: 26px; height: 26px; border-radius: 5px; background: var(--accent); position: relative; flex: none; }
+.mark::before { content: ""; position: absolute; left: 6px; right: 6px; top: 7px; height: 2px; background: var(--on-accent); box-shadow: 0 5px 0 var(--on-accent); }
+.mark::after { content: ""; position: absolute; left: 6px; width: 7px; top: 17px; height: 2px; background: var(--on-accent); }
+.brand strong { display: block; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; }
+.brand small { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.3; }
+.appmeta { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
+.tag { border: 1px solid var(--rule-strong); border-radius: 4px; padding: 1px 8px; font-size: 12px; }
+.local { display: inline-flex; align-items: center; gap: 7px; }
+.local i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* 본문 2분할 */
+.shell { display: grid; grid-template-columns: minmax(0, 410px) minmax(0, 1fr); gap: 16px; align-items: start; padding-block: 16px; }
+@media (max-width: 899px) { .shell { grid-template-columns: minmax(0, 1fr); } }
+.pane { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; min-width: 0; }
+.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 11px 16px; border-bottom: 1px solid var(--rule); background: var(--panel-2); border-radius: 8px 8px 0 0; }
+.pane-head h2 { font-size: 14px; font-weight: 600; }
+.tools { display: flex; gap: 6px; }
+.btn-ghost { font-size: 12.5px; border: 1px solid var(--rule-strong); background: var(--panel); color: var(--ink-2); border-radius: 5px; padding: 3px 10px; cursor: pointer; }
+.btn-ghost:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* 입력 패널 */
+.input-pane { display: flex; flex-direction: column; }
+@media (min-width: 900px) {
+  .input-pane { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); max-height: calc(100vh - 88px); }
+  .pane-body { overflow-y: auto; flex: 1; min-height: 0; }
+}
+.grp { padding: 16px; border-bottom: 1px solid var(--rule); display: grid; gap: 10px; }
+.grp:last-child { border-bottom: 0; }
+.grp h3 { font-size: 13.5px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+.grp h3 .code { font-family: var(--font-num); font-size: 11.5px; color: var(--ink-3); font-weight: 500; }
+.hint { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 10px; }
+legend { padding: 0; margin-bottom: 10px; }
+.seg { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 1px; background: var(--rule-strong); border: 1px solid var(--rule-strong); border-radius: var(--r); overflow: hidden; }
+.seg label { position: relative; display: flex; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--panel); padding: 7px 4px; font-size: 13px; line-height: 1.3; color: var(--ink-2); cursor: pointer; transition: background .12s, color .12s; }
+.seg label:hover span { color: var(--ink); background: var(--panel-2); }
+.seg input:checked + span { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -4px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+@media (max-width: 380px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > span { font-size: 12.5px; color: var(--ink-2); }
+.money { display: flex; align-items: center; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--panel); }
+.money:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.money input { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 14.5px; width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); padding: 7px 8px 7px 10px; outline: none; text-align: right; }
+.money input::placeholder { color: var(--ink-3); }
+.money em { font-style: normal; font-size: 12px; color: var(--ink-3); padding-right: 10px; flex: none; }
+select { font: inherit; font-size: 14px; width: 100%; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--panel); color: var(--ink); padding: 7px 8px; }
+.checks { display: grid; gap: 7px; }
+.checks label { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; cursor: pointer; }
+.checks input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
+.actions { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--rule); border-radius: 0 0 8px 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; }
+.err { font-size: 13px; color: var(--stop); }
+.run { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; border: 0; border-radius: var(--r); background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 14.5px; padding: 10px 14px; cursor: pointer; }
+.run:hover { filter: brightness(1.08); }
+kbd { font-family: var(--font-num); font-size: 11px; font-weight: 500; border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; opacity: .8; }
+
+/* 판정서 패널 */
+.report-meta { font-size: 12px; color: var(--ink-3); }
+.report-body { padding: 16px; display: grid; gap: 16px; }
+.stale { background: var(--hold-wash); color: var(--hold); border-radius: var(--r); padding: 8px 12px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.stale button { font-size: 12.5px; border: 1px solid currentColor; background: none; border-radius: 5px; padding: 2px 10px; cursor: pointer; }
+.out { display: grid; gap: 16px; transition: opacity .2s; }
+.out.dim { opacity: .4; }
+.verdict { border: 1px solid var(--accent); background: var(--accent-wash); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 4px; }
+.verdict .k { font-size: 12px; font-weight: 600; color: var(--accent); }
+.verdict h3 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; line-height: 1.4; }
+.verdict p { color: var(--ink-2); font-size: 14px; max-width: 70ch; }
+.conds { display: flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: var(--r); margin: 0; overflow: hidden; }
+.conds div { flex: 1 1 104px; padding: 7px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin: 0 -1px -1px 0; min-width: 0; }
+.conds dt { font-size: 11.5px; color: var(--ink-3); }
+.conds dd { margin: 0; font-size: 13.5px; font-weight: 500; }
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sec-h h3 { font-size: 13.5px; font-weight: 600; }
+.sec-h small { font-size: 12px; color: var(--ink-3); }
+.calc { border: 1px solid var(--rule); border-radius: var(--r); display: grid; }
+.figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fig { padding: 12px 14px; border-right: 1px solid var(--rule); display: grid; gap: 2px; min-width: 0; }
+.fig:last-child { border-right: 0; }
+.fig span { font-size: 12px; color: var(--ink-2); }
+.fig b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 500; font-size: clamp(16px, 2.2vw, 21px); overflow-wrap: anywhere; }
+.fig b.good { color: var(--ok); }
+@media (max-width: 480px) { .fig { padding: 10px; } .fig b { font-size: 15px; white-space: nowrap; overflow-wrap: normal; } }
+@media (max-width: 899px) { .appbar { position: static; } .local { font-size: 12px; } }
+.calc-foot { border-top: 1px solid var(--rule); padding: 12px 14px; display: grid; gap: 8px; background: var(--panel-2); border-radius: 0 0 var(--r) var(--r); }
+.bar { display: flex; height: 10px; border-radius: 2px; overflow: hidden; background: var(--ok-wash); }
+.bar .pay { background: var(--pay); }
+.bar .free { flex: 1; background: var(--ok); opacity: .6; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 1px; margin-right: 6px; vertical-align: -1px; }
+.formula { font-family: var(--font-num); font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
+
+.tbl { border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden; }
+.trow { display: grid; grid-template-columns: 96px 150px minmax(0, 1fr); gap: 0 14px; padding: 12px 14px; border-bottom: 1px solid var(--rule); align-items: start; }
+.trow:last-child { border-bottom: 0; }
+.thead { background: var(--panel-2); padding-block: 7px; font-size: 12px; color: var(--ink-3); }
+.st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 2px; border: 1.5px solid currentColor; }
+.s-fit .st { background: var(--ok-wash); color: var(--ok); }
+.s-fit .st::before { background: currentColor; }
+.s-maybe .st { background: var(--hold-wash); color: var(--hold); }
+.s-maybe .st::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.s-no .st { color: var(--ink-3); border: 1px solid var(--rule); }
+.s-wait .st { color: var(--ink-3); border: 1px dashed var(--rule-strong); }
+.nm b { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.nm small { font-size: 12px; color: var(--ink-3); }
+.s-no .nm b, .s-no .ds p { color: var(--ink-3); font-weight: 500; }
+.ds { display: grid; gap: 5px; min-width: 0; }
+.ds p { font-size: 14px; font-weight: 500; }
+.ds ul { margin: 0; padding-left: 16px; display: grid; gap: 2px; font-size: 13px; color: var(--ink-2); }
+.ds li::marker { color: var(--ink-3); }
+.ds .w { color: var(--hold); }
+.ds a { font-size: 12.5px; justify-self: start; }
+.s-wait .ds p { color: var(--ink-3); font-weight: 400; font-size: 13px; }
+@media (max-width: 600px) {
+  .trow { grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; }
+  .trow .ds { grid-column: 1 / -1; }
+  .thead { display: none; }
+}
+.empty-note { display: grid; gap: 4px; padding: 4px 0 2px; }
+.empty-note h3 { font-size: 16px; font-weight: 600; }
+.empty-note p { color: var(--ink-2); font-size: 13.5px; max-width: 62ch; }
+.empty-note button { justify-self: start; margin-top: 6px; }
+
+/* 하단 */
+.lower { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-bottom: 16px; }
+@media (max-width: 899px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+.lower .pane-body { padding: 14px 16px; }
+.caution { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: 13.5px; color: var(--ink-2); }
+.caution b { color: var(--stop); font-weight: 600; }
+.ct { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.ct:last-child { border-bottom: 0; }
+.ct small { display: block; color: var(--ink-3); font-size: 12px; }
+.tel { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 14px; user-select: all; }
+.statusbar { border-top: 1px solid var(--rule); background: var(--panel); }
+.statusbar .inner { display: flex; flex-wrap: wrap; gap: 4px 18px; padding-block: 10px 14px; font-size: 12px; color: var(--ink-3); }
+.statusbar span { min-width: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="appbar gut">
+  <div class="inner">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div><strong>채무조정 진단</strong><small>공적 채무조정·탕감 제도 적합성 판정</small></div>
+    </div>
+    <div class="appmeta">
+      <span class="tag">기준 2026.11</span>
+      <span class="local"><i aria-hidden="true"></i>입력값은 이 화면에서만 계산되고 저장되지 않습니다</span>
+    </div>
+  </div>
+</header>
+
+<main class="gut">
+  <div class="inner shell">
+    <form id="f" class="pane input-pane" novalidate>
+      <div class="pane-head">
+        <h2>사건 입력</h2>
+        <div class="tools">
+          <button type="button" class="btn-ghost" id="sampleBtn">예시 불러오기</button>
+          <button type="button" class="btn-ghost" id="clearBtn">초기화</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <section class="grp">
+          <fieldset>
+            <legend><h3><span class="code">A</span>채무 구분</h3></legend>
+            <div class="seg" style="--n:2" role="radiogroup" aria-label="채무 구분">
+              <label><input type="radio" name="kind" id="kind-personal" value="personal" checked><span>개인(가계) 채무</span></label>
+              <label><input type="radio" name="kind" id="kind-biz" value="biz"><span>소상공인·자영업 채무</span></label>
+            </div>
+            <div class="checks" id="bizPeriodWrap" hidden>
+              <label><input type="checkbox" id="bizPeriod" checked> 2020년 4월~2025년 6월 사이 사업 영위</label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="grp">
+          <fieldset>
+            <legend><h3><span class="code">B</span>최장 연체 기간</h3></legend>
+            <div class="seg" style="--n:5" role="radiogroup" aria-label="최장 연체 기간">
+              <label><input type="radio" name="od" id="od-none" value="none"><span>없음</span></label>
+              <label><input type="radio" name="od" id="od-30" value="30"><span>30일 이하</span></label>
+              <label><input type="radio" name="od" id="od-89" value="89"><span>31~89일</span></label>
+              <label><input type="radio" name="od" id="od-90" value="90"><span>90일 이상</span></label>
+              <label><input type="radio" name="od" id="od-7y" value="7y"><span>7년 이상</span></label>
+            </div>
+            <p class="hint">7년 이상: 2018년 6월 19일 이전에 연체가 시작된 채무</p>
+          </fieldset>
+        </section>
+
+        <section class="grp">
+          <h3><span class="code">C</span>채무·재산 <span class="hint">(단위 만원)</span></h3>
+          <div class="fields">
+            <label class="field"><span>무담보 채무 (신용대출·카드)</span><div class="money"><input id="unsecured" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><em>만원</em></div></label>
+            <label class="field"><span>담보 채무 (주택·차량)</span><div class="money"><input id="secured" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><em>만원</em></div></label>
+            <label class="field"><span>보유 재산 (순가치)</span><div class="money"><input id="assets" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><em>만원</em></div></label>
+            <label class="field"><span>최근 6개월 신규 대출</span><div class="money"><input id="newloan" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><em>만원</em></div></label>
+          </div>
+          <p class="hint">재산은 담보 채무를 뺀 금액입니다. 개인회생에서는 이 금액(청산가치) 이상을 갚아야 합니다.</p>
+        </section>
+
+        <section class="grp">
+          <fieldset>
+            <legend><h3><span class="code">D</span>소득·가구</h3></legend>
+            <div class="seg" style="--n:3" role="radiogroup" aria-label="소득 형태">
+              <label><input type="radio" name="inc" id="inc-salary" value="salary" checked><span>급여</span></label>
+              <label><input type="radio" name="inc" id="inc-biz" value="biz"><span>사업 소득</span></label>
+              <label><input type="radio" name="inc" id="inc-none" value="none"><span>없음·불규칙</span></label>
+            </div>
+            <div class="fields">
+              <label class="field" id="incomeField"><span>월 소득 (세후)</span><div class="money"><input id="income" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><em>만원</em></div></label>
+              <label class="field"><span>가구원 수 (본인 포함)</span>
+                <select id="hh">
+                  <option value="1" selected>1인</option>
+                  <option value="2">2인</option>
+                  <option value="3">3인</option>
+                  <option value="4">4인</option>
+                  <option value="5">5인 이상</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="grp">
+          <fieldset>
+            <legend><h3><span class="code">E</span>해당 사항</h3></legend>
+            <div class="checks">
+              <label><input type="checkbox" id="v-basic"> 기초생활수급자</label>
+              <label><input type="checkbox" id="v-disabled"> 중증장애인</label>
+              <label><input type="checkbox" id="v-elder"> 만 70세 이상</label>
+              <label><input type="checkbox" id="gamble"> 채무의 상당 부분이 도박·코인·주식 투기 손실</label>
+            </div>
+          </fieldset>
+        </section>
+      </div>
+      <div class="actions">
+        <p class="err" id="err" role="alert" hidden></p>
+        <button type="submit" class="run">판정 실행 <kbd>Enter</kbd></button>
+      </div>
+    </form>
+
+    <section class="pane" id="results" aria-live="polite">
+      <div class="pane-head">
+        <h2>판정 결과</h2>
+        <span class="report-meta num" id="reportMeta">대기 중</span>
+      </div>
+      <div class="report-body">
+        <div class="empty-note" id="empty">
+          <h3>입력 후 Enter를 누르면 판정서가 작성됩니다</h3>
+          <p>권고 조치, 개인회생 변제금 산정, 아래 5개 제도의 적합성 판정이 이 자리에 나옵니다. 처음이라면 예시 사건으로 결과 형식을 먼저 확인해 보세요.</p>
+          <button type="button" class="btn-ghost" id="sampleBtn2">예시 사건으로 판정해 보기</button>
+        </div>
+        <div class="tbl" id="ghost">
+          <div class="trow thead"><span>판정</span><span>제도</span><span>요지</span></div>
+          <div class="trow s-wait"><div><span class="st">판정 전</span></div><div class="nm"><b>새도약기금</b><small>장기연체채권 소각</small></div><div class="ds"><p>7년 이상 연체, 원금 5천만원 이하</p></div></div>
+          <div class="trow s-wait"><div><span class="st">판정 전</span></div><div class="nm"><b>새출발기금</b><small>소상공인·자영업자</small></div><div class="ds"><p>2020.4~2025.6 사업자, 원금 최대 90% 감면</p></div></div>
+          <div class="trow s-wait"><div><span class="st">판정 전</span></div><div class="nm"><b>신용회복위원회</b><small>신속·프리·개인워크아웃</small></div><div class="ds"><p>연체 기간에 따라 이자 인하부터 원금 감면까지</p></div></div>
+          <div class="trow s-wait"><div><span class="st">판정 전</span></div><div class="nm"><b>개인회생</b><small>법원</small></div><div class="ds"><p>3년간 가용소득을 갚고 나머지 면책</p></div></div>
+          <div class="trow s-wait"><div><span class="st">판정 전</span></div><div class="nm"><b>개인파산·면책</b><small>법원</small></div><div class="ds"><p>소득이 생계비 이하일 때 전액 면책</p></div></div>
+        </div>
+
+        <div class="stale" id="stale" hidden><span>입력값이 바뀌었습니다. Enter를 눌러 다시 판정하세요.</span><button type="button" id="recheck">다시 판정</button></div>
+        <div class="out" id="out" hidden>
+          <div class="verdict" id="first"></div>
+          <dl class="conds" id="echo"></dl>
+          <div id="calcWrap" hidden>
+            <div class="sec-h"><h3>개인회생 변제금 산정</h3><small>3년(36개월) 기준 · 참고치</small></div>
+            <div class="calc" id="calc"></div>
+          </div>
+          <div class="sec-h"><h3>제도별 판정</h3><small>적합 → 검토 필요 → 비대상 순</small></div>
+          <div class="tbl" id="cards"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="inner lower">
+    <section class="pane">
+      <div class="pane-head"><h2>신청 전 확인 사항</h2></div>
+      <div class="pane-body">
+        <ul class="caution">
+          <li><b>접수 전에는 상환을 멈추지 마세요.</b> 추심은 신복위 접수 통지나 법원 금지·중지명령 뒤에 멈춥니다. 그 전에 연체하면 이자와 신용 하락만 늘어납니다.</li>
+          <li>"원금 90% 탕감"은 제도의 상한입니다. 실제 감면은 소득과 재산으로 계산됩니다.</li>
+          <li>새도약기금은 신청 절차가 없습니다. 돈을 받고 소각 대상에 넣어 준다는 연락은 사기입니다.</li>
+          <li>대리인을 쓴다면 담당 변호사·법무사를 협회에서 조회하고, 총비용과 기각 시 환불 조건을 서면으로 받으세요.</li>
+        </ul>
+      </div>
+    </section>
+    <section class="pane">
+      <div class="pane-head"><h2>무료 상담 창구</h2></div>
+      <div class="pane-body" id="contacts"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="statusbar gut">
+  <div class="inner">
+    <span>개인회생 산식: (월소득 − 기준중위소득 60%) × 36개월, 청산가치 이상</span>
+    <span>생계비 기준 2026년</span>
+    <span>참고용 진단이며 법률 자문이 아닙니다. 신청 전 상담 창구에서 확인하세요.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // 2026년 개인회생 생계비 (기준중위소득 60%, 원)
+  const LIVING = { 1: 1538543, 2: 2519575, 3: 3215422, 4: 3896843, 5: 4534031 };
+  const CONTACTS = [
+    ["신용회복위원회", "신속·프리·개인워크아웃 상담과 신청", "1600-5500"],
+    ["새출발기금", "소상공인·자영업자 부실차주 상담", "1660-1378"],
+    ["서민금융진흥원", "채무조정·서민금융 연계", "1397"],
+    ["대한법률구조공단", "개인회생·파산 상담, 저소득층 신청 지원", "132"],
+    ["새도약기금", "장기연체채권 소각 여부 조회", "1660-0705"]
+  ];
+  const $ = (id) => document.getElementById(id);
+  const form = $("f");
+
+  const num = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : 0; };
+  const radio = (name) => (form.querySelector('input[name="' + name + '"]:checked') || {}).value;
+  const won = (man) => {
+    man = Math.round(man);
+    if (man <= 0) return "0원";
+    const eok = Math.floor(man / 10000), rest = man % 10000;
+    if (eok && rest) return eok + "억 " + rest.toLocaleString("ko-KR") + "만원";
+    if (eok) return eok + "억원";
+    return rest.toLocaleString("ko-KR") + "만원";
+  };
+  const pct = (r) => Math.round(r * 100) + "%";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function readState() {
+    return {
+      kind: radio("kind"), bizPeriod: $("bizPeriod").checked, od: radio("od"),
+      unsecured: num("unsecured"), secured: num("secured"), assets: num("assets"), newloan: num("newloan"),
+      inc: radio("inc"), income: radio("inc") === "none" ? 0 : num("income"), hh: Math.min(5, Math.max(1, parseInt($("hh").value, 10) || 1)),
+      vulnerable: $("v-basic").checked || $("v-disabled").checked || $("v-elder").checked,
+      basic: $("v-basic").checked, gamble: $("gamble").checked
+    };
+  }
+
+  function evaluate(s) {
+    const total = s.unsecured + s.secured;
+    const late90 = s.od === "90" || s.od === "7y";
+    const living = LIVING[s.hh] / 10000; // 만원
+    const avail = s.income - living;
+    const out = {};
+
+    // 새도약기금
+    if (s.od === "7y") {
+      if (s.unsecured <= 5000) {
+        out.newleap = { status: "fit", headline: "신청 없이 기금이 채권을 사들여 소각합니다. 비용이 들지 않습니다.",
+          reasons: ["7년 이상 연체, 원금 5천만원 이하 요건에 맞습니다.",
+            s.basic ? "기초생활수급자는 상환능력 심사 없이 소각 대상입니다." : "상환능력 심사에서 갚을 능력이 있다고 보면 추심이 다시 시작될 수 있습니다.",
+            "새도약기금 누리집에서 내 채무의 매입·소각 여부를 조회하세요."] };
+      } else {
+        out.newleap = { status: "maybe", headline: "일부 채권만 소각 대상일 수 있습니다.",
+          reasons: ["입력한 무담보 빚이 5천만원을 넘습니다. 오래된 채권 중 기준에 맞는 것이 있는지 조회해 보세요."] };
+      }
+    } else {
+      out.newleap = { status: "no", headline: "7년 이상(2018년 6월 19일 이전 시작) 연체된 빚이 대상입니다.", reasons: [] };
+    }
+
+    // 새출발기금
+    if (s.kind === "biz") {
+      if (!s.bizPeriod) {
+        out.fresh = { status: "maybe", headline: "사업 기간 요건을 먼저 확인하세요.",
+          reasons: ["2020년 4월~2025년 6월 사이 사업을 한 소상공인·자영업자가 대상입니다."] };
+      } else if (late90) {
+        out.fresh = { status: "fit", headline: "부실차주: 원금 최대 90% 감면, 최장 20년 분할 상환",
+          reasons: ["연체 90일 이상이면 기금이 채권을 사들여 원금을 감면합니다(매입형).",
+            "1년 이상 성실 상환 후 조기 상환하면 5~10% 추가 감면이 있습니다."] };
+      } else {
+        out.fresh = { status: "fit", headline: "부실우려차주: 원금 감면 없이 금리 인하와 장기 분할",
+          reasons: ["연체 90일 미만이면 원금은 그대로 두고 금리를 낮춰 최장 10년(금융취약계층 20년) 나눠 갚습니다.",
+            "1년 성실 상환마다 처음 금리의 10%씩 추가 인하(최대 4년)됩니다."] };
+      }
+    } else {
+      out.fresh = { status: "no", headline: "소상공인·자영업자의 사업 빚이 대상입니다.", reasons: [] };
+    }
+
+    // 신용회복위원회
+    const ccrsName = s.od === "none" || s.od === "30" ? "신속채무조정" : s.od === "89" ? "프리워크아웃" : "개인워크아웃";
+    const ccrs = { name: ccrsName, status: "fit", reasons: [] };
+    if (ccrsName === "신속채무조정") ccrs.headline = "이자를 낮추고 최장 10년 나눠 갚습니다. 원금 감면은 원칙적으로 없습니다.";
+    else if (ccrsName === "프리워크아웃") ccrs.headline = "약정이자 30~70% 인하, 연체이자 감면, 최장 10년 분할 상환";
+    else ccrs.headline = s.vulnerable ? "이자 전액 감면, 원금 최대 90% 감면(취약계층)" : "이자 전액 감면, 상각된 채권은 원금 20~70% 감면";
+    if (ccrsName === "개인워크아웃") {
+      ccrs.reasons.push("금융회사가 이미 상각한 채권일수록 감면 폭이 큽니다. 상각 여부는 신복위 상담에서 확인됩니다.");
+      if (total > 150000 || s.unsecured > 50000) { ccrs.status = "no"; ccrs.headline = "빚이 한도(총 15억원, 무담보 5억원)를 넘어 신청할 수 없습니다."; }
+    }
+    if (total > 0 && s.newloan / total > 0.3) {
+      if (ccrs.status === "fit") ccrs.status = "maybe";
+      ccrs.reasons.push({ warn: "최근 6개월 새 대출이 전체 빚의 " + pct(s.newloan / total) + "입니다. 30%를 넘으면 신청이 제한될 수 있습니다." });
+    }
+    if (s.assets > 0 && s.assets >= s.unsecured && s.unsecured > 0) {
+      if (ccrs.status === "fit") ccrs.status = "maybe";
+      ccrs.reasons.push({ warn: "재산이 무담보 빚보다 많아 재산으로 갚으라는 판단을 받을 수 있습니다." });
+    }
+    if (total === 0) { ccrs.status = "no"; ccrs.headline = "빚 금액을 입력하면 판정합니다."; }
+    ccrs.reasons.push("접수되면 금융회사에 통지되어 추심이 멈춥니다. 상담은 무료입니다.");
+    out.ccrs = ccrs;
+
+    // 개인회생
+    const rehab = { status: "fit", reasons: [] };
+    if (s.inc === "none") {
+      rehab.status = "no"; rehab.headline = "꾸준한 소득이 있어야 신청할 수 있습니다.";
+    } else if (s.unsecured > 100000 || s.secured > 150000) {
+      rehab.status = "no"; rehab.headline = "빚이 한도(무담보 10억원, 담보 15억원)를 넘습니다.";
+    } else if (s.unsecured === 0) {
+      rehab.status = "no"; rehab.headline = "무담보 빚을 입력하면 변제금을 계산합니다.";
+    } else if (avail <= 0) {
+      rehab.status = "no"; rehab.headline = "소득이 생계비 이하라 낼 변제금이 없습니다. 파산을 검토하세요.";
+      rehab.reasons.push(s.hh + "인 가구 생계비는 월 " + won(living) + "입니다.");
+    } else {
+      const by36 = avail * 36;
+      const plan = Math.max(by36, s.assets);
+      if (plan >= s.unsecured) {
+        rehab.status = "no"; rehab.headline = "소득·재산으로 빚 전액을 갚을 수 있어 감면 효과가 없습니다.";
+      } else {
+        const rate = 1 - plan / s.unsecured;
+        rehab.calc = { monthly: plan / 36, plan, rate, living, byAssets: s.assets > by36, avail };
+        rehab.rate = rate;
+        rehab.headline = "월 " + won(plan / 36) + "씩 3년 갚으면 나머지 " + won(s.unsecured - plan) + "이 면책됩니다.";
+        if (rate < 0.2) { rehab.status = "maybe"; rehab.reasons.push({ warn: "감면 폭이 작아 신복위 조정이 더 나을 수 있습니다." }); }
+        if (s.assets > by36) rehab.reasons.push({ warn: "보유 재산(청산가치)이 3년치 가용소득보다 많아 변제총액이 재산만큼 올라갔습니다." });
+        if (s.od === "none" || s.od === "30") rehab.reasons.push("연체 전이어도 신청할 수 있습니다.");
+        rehab.reasons.push("법원 금지·중지명령이 나온 뒤에야 추심과 압류가 멈춥니다.");
+        if (s.gamble) rehab.reasons.push({ warn: "투기·도박 손실은 법원이 갚을 금액에 더하는 경우가 있어 변제금이 늘 수 있습니다." });
+      }
+    }
+    out.rehab = rehab;
+
+    // 개인파산
+    const bank = { reasons: [] };
+    if (total === 0) { bank.status = "no"; bank.headline = "빚 금액을 입력하면 판정합니다."; }
+    else if (s.inc === "none" || avail <= 0) {
+      if (s.assets >= total) { bank.status = "no"; bank.headline = "재산으로 빚을 갚을 수 있어 파산 대상이 아닙니다."; }
+      else {
+        bank.status = s.gamble ? "maybe" : "fit";
+        bank.headline = "재산을 정리해 나누고 나머지를 전액 면책받을 수 있습니다.";
+        bank.reasons.push("소득이 없거나 생계비 이하일 때 맞는 제도입니다.");
+        if (s.gamble) bank.reasons.push({ warn: "도박·투기로 빚을 크게 늘린 경우는 면책 불허가 사유입니다. 법원이 일부만 면책하기도 합니다." });
+        bank.reasons.push("세금·벌금·양육비는 면책되지 않습니다.");
+      }
+    } else {
+      bank.status = "no"; bank.headline = "생계비를 넘는 소득이 있으면 보통 회생으로 안내됩니다.";
+    }
+    out.bank = bank;
+
+    return out;
+  }
+
+  function pickFirst(s, r) {
+    if (r.newleap.status === "fit") return { title: "새도약기금 소각 대상인지부터 조회하세요", text: "7년 넘게 밀린 5천만원 이하 빚은 신청하지 않아도 기금이 사들여 소각합니다. 누리집이나 1660-0705에서 확인하고, 남는 빚이 있으면 아래 제도를 보세요." };
+    if (r.fresh.status === "fit") return { title: "새출발기금을 먼저 알아보세요", text: r.fresh.headline + ". 사업 빚이 아닌 개인 빚이 함께 있다면 신복위나 개인회생도 같이 비교하세요." };
+    if (r.bank.status === "fit") return { title: "개인파산·면책을 검토하세요", text: "소득이 생계비 이하라 회생 변제금을 낼 수 없습니다. 대한법률구조공단(132)에서 무료로 상담과 신청 지원을 받을 수 있습니다." };
+    const work = r.ccrs.name === "개인워크아웃" && r.ccrs.status !== "no";
+    if (r.rehab.status === "fit" && (r.rehab.rate >= 0.7 || !work && (s.od === "90" || s.od === "7y"))) {
+      return { title: "개인회생이 가장 많이 줄여 줄 가능성이 큽니다", text: "예상 감면율 " + pct(r.rehab.rate) + "로, 신복위 개인워크아웃의 일반 감면 범위(상각채권 20~70%)보다 큽니다. 법률구조공단이나 법원 상담 창구에서 변제금을 확인하세요." };
+    }
+    if (r.ccrs.status !== "no") {
+      const extra = r.rehab.status === "fit" ? " 개인회생 예상 감면율은 " + pct(r.rehab.rate) + "이니 함께 비교하세요." : "";
+      return { title: "신용회복위원회 " + r.ccrs.name + "부터 상담하세요", text: r.ccrs.headline + "." + extra };
+    }
+    if (r.rehab.status !== "no") return { title: "개인회생을 검토하세요", text: r.rehab.headline };
+    return { title: "입력한 조건에 바로 맞는 제도가 없습니다", text: "빚 금액과 연체 기간을 확인하고, 신용회복위원회(1600-5500)에서 본인 조건으로 상담하세요." };
+  }
+
+  const STATUS = { fit: "적합", maybe: "검토 필요", no: "비대상" };
+  const ORDER = { fit: 0, maybe: 1, no: 2 };
+  const OD_LABEL = { none: "연체 없음", "30": "30일 이하", "89": "31~89일", "90": "90일 이상", "7y": "7년 이상" };
+  let shown = false, runNo = 0;
+
+  function row(c) {
+    const reasons = c.status === "no" ? "" : (c.reasons || []).map((x) => typeof x === "string" ? "<li>" + esc(x) + "</li>" : '<li class="w">' + esc(x.warn) + "</li>").join("");
+    const link = c.status !== "no" && c.link ? '<a href="' + c.link[1] + '" target="_blank" rel="noopener">' + esc(c.link[0]) + ' ↗</a>' : "";
+    return '<div class="trow s-' + c.status + '"><div><span class="st">' + STATUS[c.status] + '</span></div>' +
+      '<div class="nm"><b>' + esc(c.title) + '</b><small>' + esc(c.org) + '</small></div>' +
+      '<div class="ds"><p>' + esc(c.headline) + '</p>' + (reasons ? '<ul>' + reasons + '</ul>' : "") + link + '</div></div>';
+  }
+
+  function calcBlock(k, s) {
+    const pay = Math.max(2, Math.min(100, (1 - k.rate) * 100));
+    return '<div class="figs">' +
+        '<div class="fig"><span>월 변제금</span><b>' + won(k.monthly) + '</b></div>' +
+        '<div class="fig"><span>총 변제액</span><b>' + won(k.plan) + '</b></div>' +
+        '<div class="fig"><span>예상 면책률</span><b class="good">' + pct(k.rate) + '</b></div>' +
+      '</div><div class="calc-foot">' +
+        '<div class="bar" role="img" aria-label="무담보 채무 중 변제 ' + pct(1 - k.rate) + ', 면책 ' + pct(k.rate) + '"><span class="pay" style="width:' + pay.toFixed(1) + '%"></span><span class="free"></span></div>' +
+        '<div class="legend"><span><i style="background:var(--pay)"></i>변제 ' + won(k.plan) + '</span><span><i style="background:var(--ok);opacity:.6"></i>면책 ' + won(s.unsecured - k.plan) + '</span><span>무담보 채무 ' + won(s.unsecured) + '</span></div>' +
+        '<div class="formula">(월소득 ' + won(s.income) + ' − 생계비 ' + won(k.living) + ') × 36' + (k.byAssets ? ' < 재산 ' + won(k.plan) + ' → 청산가치 기준 적용' : ' = ' + won(k.plan)) + '</div>' +
+      '</div>';
+  }
+
+  function render() {
+    const s = readState();
+    const r = evaluate(s);
+    const first = pickFirst(s, r);
+    $("first").innerHTML = '<span class="k">권고 조치</span><h3>' + esc(first.title) + '</h3><p>' + esc(first.text) + '</p>';
+
+    const conds = [
+      ["채무 구분", s.kind === "biz" ? "소상공인·자영업" : "개인(가계)"],
+      ["최장 연체", OD_LABEL[s.od]],
+      ["무담보 채무", won(s.unsecured)],
+      ["담보 채무", won(s.secured)],
+      ["보유 재산", won(s.assets)],
+      ["월 소득", s.inc === "none" ? "없음·불규칙" : won(s.income)],
+      ["가구원", s.hh + (s.hh === 5 ? "인 이상" : "인")]
+    ];
+    $("echo").innerHTML = conds.map((c) => '<div><dt>' + c[0] + '</dt><dd>' + esc(c[1]) + '</dd></div>').join("");
+
+    $("calcWrap").hidden = !r.rehab.calc;
+    $("calc").innerHTML = r.rehab.calc ? calcBlock(r.rehab.calc, s) : "";
+
+    const list = [
+      Object.assign({ title: "새도약기금", org: "장기연체채권 매입·소각", link: ["새도약기금 누리집", "https://www.newleap.or.kr"] }, r.newleap),
+      Object.assign({ title: "새출발기금", org: "소상공인·자영업자", link: ["새출발기금 누리집", "https://새출발기금.kr"] }, r.fresh),
+      Object.assign({ title: r.ccrs.name, org: "신용회복위원회", link: ["신복위 사이버상담부", "https://cyber.ccrs.or.kr"] }, r.ccrs),
+      Object.assign({ title: "개인회생", org: "법원", link: ["대한법률구조공단", "https://www.klac.or.kr"] }, r.rehab),
+      Object.assign({ title: "개인파산·면책", org: "법원", link: ["대한법률구조공단", "https://www.klac.or.kr"] }, r.bank)
+    ];
+    list.sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+    $("cards").innerHTML = '<div class="trow thead"><span>판정</span><span>제도</span><span>요지</span></div>' + list.map(row).join("");
+
+    runNo += 1;
+    const t = new Date();
+    $("reportMeta").textContent = "판정 " + String(runNo).padStart(3, "0") + " · " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+  }
+
+  function toggleFields() {
+    $("bizPeriodWrap").hidden = radio("kind") !== "biz";
+    $("incomeField").hidden = radio("inc") === "none";
+  }
+
+  function validate() {
+    if (!radio("od")) return ["최장 연체 기간을 선택하세요. 연체가 없으면 '없음'을 누르세요.", $("od-none")];
+    if (num("unsecured") + num("secured") === 0) return ["무담보 또는 담보 채무 금액을 입력하세요.", $("unsecured")];
+    if (radio("inc") !== "none" && $("income").value.trim() === "") return ["월 소득을 입력하거나 소득 형태에서 '없음·불규칙'을 고르세요.", $("income")];
+    return null;
+  }
+
+  function submit() {
+    const bad = validate();
+    if (bad) {
+      $("err").textContent = bad[0]; $("err").hidden = false;
+      bad[1].focus();
+      return;
+    }
+    $("err").hidden = true;
+    render();
+    shown = true;
+    $("empty").hidden = true; $("ghost").hidden = true; $("stale").hidden = true;
+    $("out").hidden = false; $("out").classList.remove("dim");
+    if (window.matchMedia("(max-width: 899px)").matches) $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function markStale() {
+    $("err").hidden = true;
+    if (!shown) return;
+    $("stale").hidden = false;
+    $("out").classList.add("dim");
+  }
+
+  function renderContacts() {
+    $("contacts").innerHTML = CONTACTS.map((c) =>
+      '<div class="ct"><div>' + esc(c[0]) + '<small>' + esc(c[1]) + '</small></div><span class="tel">' + c[2] + '</span><button type="button" class="btn-ghost copy" data-tel="' + c[2] + '">복사</button></div>').join("");
+    $("contacts").addEventListener("click", (e) => {
+      const b = e.target.closest(".copy"); if (!b) return;
+      const done = () => { b.textContent = "복사됨"; setTimeout(() => (b.textContent = "복사"), 1500); };
+      try {
+        navigator.clipboard.writeText(b.dataset.tel).then(done, () => selectTel(b));
+      } catch (err) { selectTel(b); }
+    });
+  }
+  function selectTel(b) {
+    const el = b.previousElementSibling, range = document.createRange();
+    range.selectNodeContents(el); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  }
+
+  function setValues(v) {
+    ["unsecured", "secured", "assets", "newloan", "income"].forEach((id) => ($(id).value = v[id] == null ? "" : v[id]));
+    ["v-basic", "v-disabled", "v-elder", "gamble"].forEach((id) => ($(id).checked = false));
+    $("kind-personal").checked = true; $("inc-salary").checked = true; $("bizPeriod").checked = true;
+    form.querySelectorAll('input[name="od"]').forEach((el) => (el.checked = el.value === v.od));
+    $("hh").value = v.hh;
+    toggleFields();
+  }
+
+  const loadSample = () => {
+    setValues({ od: "90", unsecured: 8000, secured: 0, assets: 500, newloan: 0, income: 280, hh: "2" });
+    submit();
+  };
+  $("sampleBtn").addEventListener("click", loadSample);
+  $("sampleBtn2").addEventListener("click", loadSample);
+  $("clearBtn").addEventListener("click", () => {
+    setValues({ od: null, hh: "1" });
+    shown = false;
+    $("err").hidden = true; $("stale").hidden = true; $("out").hidden = true;
+    $("empty").hidden = false; $("ghost").hidden = false;
+    $("reportMeta").textContent = "대기 중";
+    $("unsecured").focus();
+  });
+  $("recheck").addEventListener("click", submit);
+
+  // Enter 키: 숫자 칸·선택 버튼·체크박스·가구원 수 어디서 눌러도 판정 실행
+  form.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.target.tagName === "BUTTON") return;
+    e.preventDefault();
+    submit();
+  });
+  form.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+  form.addEventListener("input", markStale);
+  form.addEventListener("change", () => { toggleFields(); markStale(); });
+  renderContacts();
+  toggleFields();
+})();
+</script>
+
+</body></html>
